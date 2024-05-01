@@ -8,7 +8,7 @@ Original fasta + mmseqs tsv output -> fully annotated fasta -> annotated tsv
 todo.py : Annotate original fasta file with clusters from using tsv file 
 Clustering tsv output -> annotated fasta
 
-# For pair ranking
+# For pair ranking : 
 get_annotations.py : Create .txt files (1 per fragment) with annotated proteins (used for pair ranking labels)
 Annotated fasta -> folder
 
