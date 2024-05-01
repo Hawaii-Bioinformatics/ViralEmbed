@@ -4,7 +4,7 @@ import csv
 
 input_tsv_path = '/home/thibaut/mmseqs_clustering/out_cluster_cluster.tsv'
 input_fasta_path = '/home/thibaut/pol_hel_rnr/annotated_Keep_ENA_votu_embedding_formatted_clustered_all.fasta'  
-output_tsv_path = '/home/thibaut/mmseqs_clustering/out_cluster_named_ednc.tsv'
+output_tsv_path = '/home/thibaut/mmseqs_clustering/out_cluster_named.tsv'
 
 protein_descriptions = {}
 
@@ -32,4 +32,4 @@ with open(input_tsv_path, 'r') as tsv_file, open(output_tsv_path, 'w', newline='
             # Write the new line with the added descriptions
             tsv_writer.writerow([protein1_id, protein2_id, description1, description2])
 
-print("Fichier TSV modifié généré avec succès.")
+print("Modified TSV file generated.")
