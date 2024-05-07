@@ -1,7 +1,7 @@
 # Script to rank annotated + clustered pairs
 
 ### For mmseqs clustering : 
-cluster_fasta_annot.py + annot_tsv.py : Complete mmseqs clustering with X/Y clusters, retaining POL/HEL/RNR  
+cluster_fasta_annot.py + annot_tsv.py (optional) : Complete mmseqs clustering with X/Y clusters, retaining POL/HEL/RNR  
 Original fasta + mmseqs tsv output -> fully annotated fasta -> annotated tsv
 
 ### For complete clustering : 
