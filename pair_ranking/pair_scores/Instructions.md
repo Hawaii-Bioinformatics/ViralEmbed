@@ -10,8 +10,4 @@ Create a fasta file for every proteins in the assembled fasta file (1)
 # pair_ranking_no_annot.py 
 Create .pkl for every genome with all the scores of every pair of proteins. 
 
-Bash commands to keep only processed genoms : 
 
-mkdir -p /path_to_final_folder/; for f in /home/thibaut/KEEP_80_v3/*.txt; do bn=$(basename "$f" .txt);
-if [ -f "/path_to_former_folder/pairs/$bn.pickle" ]; then cp "$f" "/path_to_final_folder/$bn.txt";
-cp "/path_to_former_folder/pairs/$bn.pickle" "/path_to_final_folder/$bn.pickle"; fi; done
