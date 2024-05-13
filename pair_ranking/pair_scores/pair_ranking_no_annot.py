@@ -19,9 +19,13 @@ import pickle
 hel_pol_rnr_assembled_fasta = '/home/thibaut/Keep_assembled_annotated_sequences_corr_annot_11k.fasta'
 attention_path = '/home/thibaut/KEEP_80_v3_results/attentions/'
 pkl_save_path = '/home/thibaut/KEEP_80_v3/pkl/'
+pkl_sizes_save_path = '/home/thibaut/KEEP_80_v3/pkl_sizes/'
 labels_folder = '/home/thibaut/KEEP_80_v3/annots/'
-saving_id = '3'
-    
+saving_id = '5'
+
+protein_ids : bool = True           # Saving pkl pairs files under the format {(id1, id2) : score} (if True) // {(1, 2) : score} (if False) 
+protein_sizes : bool = False        # Saving pkl pkl files with proteins sizes
+multiprocess : bool = False         # Run on multiple CPUs
 
 run = True
 plot_figures = False
@@ -113,7 +117,8 @@ def rank_assembled_pairs(id, attention_matrix, annotation_dic, process_ranks = F
     if len(length_frag) == 1 :
         return None, None
     
-    first_prot_frag = 0
+    print(length_frag)
+    
     pairs_frag = get_pairs(length_frag, attention_matrix)
     sorted_data_frag = sorted(pairs_frag, key=lambda x: x[2], reverse=True)
     
@@ -122,15 +127,26 @@ def rank_assembled_pairs(id, attention_matrix, annotation_dic, process_ranks = F
     # print(uniq_top_pairs)
 
     dictionnaire = {cle: 0 for cle in uniq_top_pairs}
+
     for pair in top_data_frag : 
         dictionnaire[pair[0]] += pair[2]/pair[1]
 
-    dictionnaire2 = {}
-    for k, v in dictionnaire.items() : 
-        dictionnaire2[(genom_dic[x][k[0]], genom_dic[x][k[1]])] = v
-    
-    with open(f'{pkl_save_path}{x}.pkl', 'wb') as f:
-        pickle.dump(dictionnaire2, f)
+    if not protein_ids : 
+        with open(f'{pkl_save_path}{x}.pkl', 'wb') as f:
+            pickle.dump(dictionnaire2, f)
+
+    if protein_ids : 
+        dictionnaire2 = {}
+        for k, v in dictionnaire.items() : 
+            dictionnaire2[(genom_dic[x][k[0]], genom_dic[x][k[1]])] = v
+        
+        with open(f'{pkl_save_path}{x}.pkl', 'wb') as f:
+            pickle.dump(dictionnaire2, f)
+
+    if protein_sizes : 
+        with open(f'{pkl_sizes_save_path}{x}.pkl', 'wb') as f2:
+            pickle.dump(length_frag, f2)
+
     
 def list_to_dict(pairs_list):
     it = iter(pairs_list)
@@ -166,16 +182,21 @@ def get_pairs_dataset(fasta, attention_path, labels_folder, process_ranks = Fals
                 annotation_dic = list_to_dict(id_list)
 
                 attention_block = torch.load(attention_path+f'full_{i}.pt', map_location=torch.device('cpu'))
-                mlp.append((id, attention_block, annotation_dic, process_ranks, print_pairs))
-                
-    print(f"Number of sequences to process : {len(mlp)}")
+                if multiprocess : 
+                    mlp.append((id, attention_block, annotation_dic, process_ranks, print_pairs))
+                    
+                if not multiprocess : 
+                    rank_assembled_pairs(id, attention_block, annotation_dic, process_ranks, print_pairs)
+    
+    if multiprocess : 
+        print(f"Number of sequences to process : {len(mlp)}")
 
-    ### Multiprocessing
-    nombre_cpus = cpu_count()
-    print(f'{nombre_cpus} cpus availables')
+        ### Multiprocessing
+        nombre_cpus = cpu_count()
+        print(f'{nombre_cpus} cpus availables')
 
-    with Pool(processes=nombre_cpus//5) as pool:
-        results = pool.starmap(rank_assembled_pairs, mlp)
+        with Pool(processes=nombre_cpus//5) as pool:
+            results = pool.starmap(rank_assembled_pairs, mlp)
     
 
 if run : 
