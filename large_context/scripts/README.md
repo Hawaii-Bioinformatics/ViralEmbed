@@ -1,6 +1,8 @@
 ### Pair-ranking script
 ===================
 
+** Please ask us for the necessary models! ** 
+
 This script is used to rank pairs of proteins in a genome 
 
 inputs are
