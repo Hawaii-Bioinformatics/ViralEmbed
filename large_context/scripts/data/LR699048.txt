@@ -1,0 +1,16 @@
+POLA_RDKY
+Phage protein
+Minor tail protein
+Deoxynucleotide monophosphate kinase
+Phage protein
+HEL_Gp4
+Phage protein
+Phage protein
+Single-stranded DNA-binding protein
+5'-3' exonuclease
+Putative endonuclease SegE GIY-YIG domain-containing protein
+Phage protein
+Phosphoribosyl-ATP pyrophosphohydrolase-like protein
+Phage protein
+Phage protein
+RNR_NLCEC
