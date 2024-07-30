@@ -5,8 +5,8 @@ import math
 from torch.nn import LayerNorm
 from typing import Optional, Tuple, List, Union
 
-# from bio_attention import reshape_tensor_padding, transpose_for_scores_padding, chunk_proteins_padding, rows_to_crows, sparse_attention_matrix_padding, sparse_bsr_dropout, revert_padding
-# from bio_attention import generate_list, generate_couples
+from bio_attention import reshape_tensor_padding, transpose_for_scores_padding, chunk_proteins_padding, rows_to_crows, sparse_attention_matrix_padding, sparse_bsr_dropout, revert_padding
+from bio_attention import generate_list, generate_couples
 import numpy as np
 from torch.sparse._triton_ops import bsr_softmax, bsr_dense_mm
 from pos_embeddings import RotaryEmbedding
@@ -18,7 +18,7 @@ import os
 import json
 import math
 from memory_profiler import profile
-
+from two_step_attention import rank_assembled_pairs
 from transformers.pytorch_utils import apply_chunking_to_forward
 
 def gpu_memory_usage(p = True):
@@ -89,6 +89,7 @@ class SparseAttention(nn.Module):
         encoder_attention_mask=None,
         past_key_value=None,
         output_attentions=False,
+        two_step_selection=False,
         device = None, 
         init_device = None
     ):
@@ -105,6 +106,7 @@ class SparseAttention(nn.Module):
             head_mask=head_mask,
             past_key_value=past_key_value,
             output_attentions=output_attentions,
+            two_step_selection=two_step_selection,
             device = device
         )
         hidden_states.to(init_device)
@@ -179,16 +181,18 @@ class SparseSelfAttention(nn.Module) :
         position_ids: Optional[torch.LongTensor] = None,
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
         output_attentions: bool = False,
+        two_step_selection: bool = False,
         key_padding_mask: Optional[torch.LongTensor] = None,
         device : torch.device = None,
     ) :
         bsz, q_len, hidden_dim = hidden_states.size()
-        
         # To extract the attention : use proteins_sizes, proteins_interactions -> Attention row (attention for 1 protein to all proteins)
         if proteins_interactions is not None :
             proteins_sizes_cum = self.cumulative_sum(proteins_sizes.tolist())
-            start = proteins_sizes_cum[int(proteins_interactions.item())]
-            end = proteins_sizes_cum[int(proteins_interactions.item())+1]
+            start_0 = proteins_sizes_cum[int(proteins_interactions[0])]
+            end_0 = proteins_sizes_cum[int(proteins_interactions[0])+1]
+            start_1 = proteins_sizes_cum[int(proteins_interactions[1])]
+            end_1 = proteins_sizes_cum[int(proteins_interactions[1])+1]
 
         # Positional encoding & Linear layers
         key_layer = self.key(hidden_states)
@@ -202,7 +206,11 @@ class SparseSelfAttention(nn.Module) :
         value_layer = self.transpose_for_scores(value_layer)
 
         if q_len > 12000 : 
-            outputs = self.compute_attention_block_softmax(query_layer, key_layer, value_layer, start, end, proteins_interactions)
+            if proteins_interactions is not None : 
+                outputs = self.compute_attention_block_softmax(query_layer, key_layer, value_layer, start_0, end_0, start_1, end_1, proteins_interactions,proteins_sizes=proteins_sizes.tolist(),output_attentions=output_attentions,two_step_selection=two_step_selection)
+            else :
+                outputs = self.compute_attention_block_softmax(query_layer, key_layer, value_layer,output_attentions=output_attentions,two_step_selection=two_step_selection,proteins_sizes=proteins_sizes.tolist())
+
         else : 
             spmd = torch.matmul(query_layer, key_layer.transpose(-1, -2))
             attention_probs = nn.functional.softmax(spmd, dim=1)
@@ -213,9 +221,17 @@ class SparseSelfAttention(nn.Module) :
             new_chunked_context_layer_shape = chunked_context_layer.size()[:-2] + (hidden_dim,)
             chunked_context_layer = chunked_context_layer.view(new_chunked_context_layer_shape)
 
-            if proteins_interactions is not None : 
-                extracted_attention = attention_probs[:,:,start:end,:] + attention_probs[:,:,:,start:end].transpose(-1, -2)
+            if output_attentions and two_step_selection : 
+                assert(proteins_sizes is not None)
+                mat = attention_probs.sum(dim=1)
+                _, ranked_interactions_dic = rank_assembled_pairs(proteins_sizes.tolist(),mat)
+                outputs = (chunked_context_layer,ranked_interactions_dic)
+                
+
+            elif output_attentions and proteins_interactions is not None : 
+                extracted_attention = attention_probs[:,:,start_0:end_0,start_1:end_1] + attention_probs[:,:,start_1:end_1,start_0:end_0].transpose(-1, -2)
                 outputs = (chunked_context_layer, extracted_attention)
+
             else :
                 outputs = (chunked_context_layer, attention_probs) if output_attentions else (chunked_context_layer,)
 
@@ -228,7 +244,7 @@ class SparseSelfAttention(nn.Module) :
             chunked_context_layer = chunked_context_layer.view(new_chunked_context_layer_shape)
             return chunked_context_layer
     
-    def compute_attention_block(self, query_layer, key_layer, value_layer, start, end, proteins_interactions, block_size=1000, output_attentions=False):
+    def compute_attention_block(self, query_layer, key_layer, value_layer, start=None, end=None, proteins_interactions=None, block_size=1000, output_attentions=False,two_step_selection=False):
         total_size = query_layer.size(2)
         attention_probs_list = []
         context_layer_list = []
@@ -237,11 +253,12 @@ class SparseSelfAttention(nn.Module) :
         batch_size, num_heads, m, k = query_layer.shape
         n = key.shape[3]
 
-        start_q, start_r = start//block_size , start%block_size
-        end_q, end_r = end//block_size, end%block_size
-        column = []
-        row = []
-        started, finished = False, False
+        if proteins_interactions is not None : 
+            start_q, start_r = start//block_size , start%block_size
+            end_q, end_r = end//block_size, end%block_size
+            column = []
+            row = []
+            started, finished = False, False
 
         idx = 0
         for j in range(0, n, block_size):
@@ -290,24 +307,30 @@ class SparseSelfAttention(nn.Module) :
         e_x_block = torch.exp(block - max_block)
         return e_x_block, max_block
 
-    def compute_attention_block_softmax(self, query_layer, key_layer, value_layer, start, end, proteins_interactions, block_size=1000, output_attentions=False):
+    def compute_attention_block_softmax(self, query_layer, key_layer, value_layer, start_0=None, end_0=None, start_1=None, end_1=None, proteins_interactions=None,proteins_sizes=None, block_size=1000, output_attentions=False,two_step_selection=False):
         total_size = query_layer.size(2)
         attention_probs_list = []
         context_layer_list = []
         max_list = []
         exp_list = []
         
-        start_q, start_r = start//block_size , start%block_size
-        end_q, end_r = end//block_size, end%block_size
-        column = []
-        row = []
-        started, finished = False, False
+        if output_attentions and proteins_interactions is not None : 
+            start_1q, start_1r = start_1//block_size , start_1%block_size
+            end_1q, end_1r = end_1//block_size, end_1%block_size
+            start_0q, start_0r = start_0//block_size , start_0%block_size
+            end_0q, end_0r = end_0//block_size, end_0%block_size
+
+            column = []
+            row = []
+            started_r, finished_r = False, False    # rows
+            started_c, finished_c = False, False    # columns
 
         key = key_layer.transpose(-1, -2)
         batch_size, num_heads, m, k = query_layer.shape
         n = key.shape[3]
         sum_e_x_total = torch.zeros((1, 1, block_size, m), device=query_layer.device)
 
+        # FIRST STEP FOR GLOBAL SOFTMAX
         for j in range(0, n, block_size):
             j_end = min(j + block_size, n)
             block1 = query_layer[:, :, j:j_end, :]
@@ -329,34 +352,67 @@ class SparseSelfAttention(nn.Module) :
             attention_probs = e_x_block/sum_e_x_total
             context_layer = torch.matmul(attention_probs.to(value_layer.dtype), value_layer)
             context_layer_list.append(context_layer)
-            #print(attention_probs.shape)
+
             if proteins_interactions is not None : 
-                if idx == start_q and idx == end_q : 
-                    row = attention_probs[:,:,start_r:end_r,:]
-                    started = True
-                    finished = True
-                elif idx == start_q : 
-                    row.append(attention_probs[:,:,start_r:,:])
-                    started = True
-                elif idx == end_q : 
-                    row.append(attention_probs[:,:,:end_r,:])
-                    finished = True
-                elif started == True and finished == False : 
-                    row.append(attention_probs[:,:,:,:])
-                column.append(attention_probs[:,:,:,start:end])
-            if output_attentions : 
+                # ROW
+                if idx == start_0q and idx == end_0q : 
+                    row.append(attention_probs[:,:,start_0r:end_0r,start_1:end_1])
+                    started_r = True
+                    finished_r = True
+                elif idx == start_0q : 
+                    row.append(attention_probs[:,:,start_0r:,start_1:end_1])
+                    started_r = True
+                elif idx == end_0q : 
+                    row.append(attention_probs[:,:,:end_0r,start_1:end_1])
+                    finished_r = True
+                elif started_r == True and finished_r == False : 
+                    row.append(attention_probs[:,:,:,start_1:end_1])
+                # COLUMN
+                if idx == start_1q and idx == end_1q : 
+                    column.append(attention_probs[:,:,start_1r:end_1r,start_0:end_0])
+                    started_c = True
+                    finished_c = True
+                elif idx == start_1q : 
+                    column.append(attention_probs[:,:,start_1r:,start_0:end_0])
+                    started_c = True
+                elif idx == end_1q : 
+                    column.append(attention_probs[:,:,:end_1r,start_0:end_0])
+                    finished_c = True
+                elif started_c == True and finished_c == False : 
+                    column.append(attention_probs[:,:,:,start_0:end_0])
+
+            if output_attentions and two_step_selection: 
+                attention_probs_list.append(attention_probs.sum(dim=1))
+
+            elif output_attentions and proteins_interactions is None and not two_step_selection : 
                 attention_probs_list.append(attention_probs)
+
             idx +=1
+        
+        if output_attentions and two_step_selection : 
+            assert(proteins_sizes is not None)
+            mat = torch.cat(attention_probs_list, dim=1)
+            _, ranked_interactions_dic = rank_assembled_pairs(proteins_sizes,mat)
 
         context_layer = torch.cat(context_layer_list, dim=2)
         context_layer_reshaped = self.reshape_output(context_layer, hidden_dim=k*num_heads)
-        if output_attentions : 
-            out_attention = torch.cat(attention_probs_list, dim=1)
-        if proteins_interactions is not None : 
-            extracted_attention = torch.cat(row, dim=2) + torch.cat(column, dim=2).transpose(-1, -2)
+
+        if output_attentions and two_step_selection : 
+            outputs = (context_layer_reshaped,ranked_interactions_dic)
+
+        elif output_attentions and proteins_interactions is not None : 
+            cat_row = torch.cat(row, dim=2) if len(row) > 1 else row[0]
+            cat_column = torch.cat(column, dim=2) if len(column) > 1 else column[0]
+
+            extracted_attention = cat_row + cat_column.transpose(-1, -2)
             outputs = (context_layer_reshaped, extracted_attention)
+
+        elif output_attentions : 
+            out_attention = torch.cat(attention_probs_list, dim=2)
+            outputs = (context_layer_reshaped, out_attention)
+
         else :
-            outputs = (context_layer_reshaped, out_attention) if output_attentions else (context_layer_reshaped,)
+            outputs = (context_layer_reshaped,)
 
         return outputs
 
@@ -454,6 +510,7 @@ class SparseLayer(nn.Module):
         encoder_attention_mask=None,
         past_key_value=None,
         output_attentions=False,
+        two_step_selection=False,
         device = None, 
         init_device = None
     ):
@@ -466,6 +523,7 @@ class SparseLayer(nn.Module):
             attention_mask,
             head_mask,
             output_attentions=output_attentions,
+            two_step_selection=two_step_selection,
             past_key_value=self_attn_past_key_value,
             device = device, 
             init_device = init_device
@@ -557,14 +615,13 @@ class SparseEncoder(nn.Module):
         past_key_values=None,
         use_cache=None,
         output_attentions=False,
+        two_step_selection=False,
         output_hidden_states=False,
         return_dict=True,
     ):
         
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
-        all_self_attentions = () if proteins_interactions is not None else all_self_attentions
-        #all_self_attentions = [] if output_attentions else None
         all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
 
         next_decoder_cache = () if use_cache else None
@@ -595,6 +652,7 @@ class SparseEncoder(nn.Module):
                 encoder_attention_mask,
                 past_key_value,
                 output_attentions,
+                two_step_selection,
                 device, 
                 init_device
                 )
@@ -604,14 +662,20 @@ class SparseEncoder(nn.Module):
             if use_cache:
                 next_decoder_cache = next_decoder_cache + (layer_outputs[-1],)
             if output_attentions:
-                #if i == 15 or i == 13 : 
-                #    all_self_attentions = all_self_attentions + layer_outputs[1] 
-                #torch.save(layer_outputs[1],f'/home/thibaut/attentions_5b/{i}.pt')
-                if all_self_attentions is None : 
-                    all_self_attentions = layer_outputs[1]
+
+                if two_step_selection : 
+                    if all_self_attentions == () : 
+                        all_self_attentions = layer_outputs[1]
+                    else :
+                        for pair, score in all_self_attentions.items():
+                            all_self_attentions[pair]+=score
+
+                elif proteins_interactions is not None : 
+                    all_self_attentions = all_self_attentions + (layer_outputs[1],)
+
                 else : 
                     all_self_attentions = all_self_attentions + (layer_outputs[1],)
-                #print(f'Layer {i}, len(all_self_attentions) = {len(all_self_attentions)}')
+
             if proteins_interactions is not None : 
                 all_self_attentions = all_self_attentions + (layer_outputs[1],)
                 
@@ -788,6 +852,7 @@ class SparseModel(nn.Module):
         past_key_values: Optional[List[torch.FloatTensor]] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
+        two_step_selection: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPoolingAndCrossAttentions]:
@@ -879,6 +944,7 @@ class SparseModel(nn.Module):
             past_key_values=past_key_values,
             use_cache=use_cache,
             output_attentions=output_attentions,
+            two_step_selection=two_step_selection,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
@@ -967,6 +1033,7 @@ class SparseForMaskedLM(nn.Module):
         encoder_attention_mask: Optional[torch.Tensor] = None,
         labels: Optional[torch.LongTensor] = None,
         output_attentions: Optional[bool] = None,
+        two_step_selection: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, MaskedLMOutput]:
@@ -1051,6 +1118,7 @@ class SparseForTokenClassification(nn.Module):
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
         output_attentions: Optional[bool] = None,
+        two_step_selection: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, TokenClassifierOutput]:
@@ -1069,6 +1137,7 @@ class SparseForTokenClassification(nn.Module):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
+            two_step_selection=two_step_selection,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
