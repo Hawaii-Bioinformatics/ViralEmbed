@@ -52,14 +52,10 @@ print(device)
 
 # DATA
 
-fasta_file = '/home/thibaut/LongVirus/data/viral.1.protein.faa'
-genom_fasta = '/home/thibaut/LongVirus/data/genoms_dataset.fa'
+genome_fasta = '/home/thibaut/LongVirus/data/genoms_dataset.fa'
 
-genoms = load_fasta_as_tuples(genom_fasta)
-num_genoms = len(genoms)
-data = [genome for genome in genoms if len(genome[1])<11000 and len(genome[1])>10000]
-print(len(data))
-genomes_name = [genome[0] for genome in genoms if len(genome[1])>61000]
+data = load_fasta_as_tuples(genome_fasta)
+
 
 # Charger la configuration et le modèle sauvegardés
 version = '3C' # or '5B'
@@ -94,7 +90,7 @@ all_attentions = []
 all_embeddings_esm = []
 all_attentions_esm = []
 
-saving_folder = '/home/thibaut/mahdi/saving_folder/'
+saving_folder = '/home/thibaut/mahdi/saving_folder/' # For embeddings & Attentions
 processed = []
 unprocessed = []
 names = []
@@ -124,29 +120,28 @@ def extract_attention(attentions, name, index1, index2):
         res.append(subset)
     return res
 
-
 def proteins_sizes_from_header(name) : 
     ps_list = name.split('_prots_')[1].split('_')
     ps_int = [int(k) for k in ps_list]
     return(ps_int)
 
+
 for i in tqdm(range(0, 1, batch_size)):
     try : 
-        print(len(data[0][1]))
         batch_labels, batch_strs, batch_tokens = batch_converter([data[i]])
         batch_inputs = batch_tokens
         batch_inputs = batch_inputs.to(device)
         sparse_model = sparse_model.to(device)
-        genome_id = 'LR699048_POLA_0_HEL_5_RNR_15_prots_899_140_270_247_64_661_93_49_282' # replace by data[i][1]
-
+        genome_id = data[i][0]
+        print(f'Processing genome {genome_id} ({len(data[i][0])} amino acids)')
         ps_int = proteins_sizes_from_header(genome_id)
-        print(ps_int)
+        print(f'Proteins sizes = {ps_int}')
         proteins_sizes = torch.Tensor(ps_int)
         print('Proteins pairs ranking...')
-        embeddings, attentions = get_embeddings(batch_inputs,i, proteins_sizes= proteins_sizes, selected_proteins=None, two_step_selection=True)
+        embeddings, attentions_ranks = get_embeddings(batch_inputs,i, proteins_sizes= proteins_sizes, selected_proteins=None, two_step_selection=True)
         
         print(embeddings.shape)
-        print(attentions)
+        print(attentions_ranks)
         selection = [1,6]
         print('\n')
         print(f'Attention pair {selection} processing...')
@@ -154,6 +149,9 @@ for i in tqdm(range(0, 1, batch_size)):
 
         print(embeddings.shape)
         print(len(attentions),attentions[0].shape)
+        attentions_ag = torch.cat(attentions, dim=1)
+
+        # IF WE EXTRACT COMPLETE FRAGMENTS EMBEDDINGS & ATTENTIONS (only for 12k aa < sequences )
 
         # extract = extract_embeddding(embeddings, genome_id, 0)
         # print(extract.shape)
@@ -161,22 +159,12 @@ for i in tqdm(range(0, 1, batch_size)):
         # print(extract_att[0].shape)
 
         all_embeddings.append(embeddings)
+        all_attentions.append(attentions_ag)
         names.append(data[i][0])
         processed.append(len(data[i][1]))
 
-    except torch.cuda.OutOfMemoryError as tc : # OOM 
-
-        # TO RUN ON CPU IF OOM
-        device2 = 'cpu'
-        sparse_model = sparse_model.to(device2)
-        batch_labels, batch_strs, batch_tokens = batch_converter([data[i]])
-        batch_inputs = batch_tokens
-        batch_inputs = batch_inputs.to(device2)
-        embeddings, attentions = get_embeddings(batch_inputs,i, proteins_sizes=None,selected_protein=None)
-        
-        all_embeddings.append(embeddings)
-        names.append(data[i][0])
-
+    except torch.cuda.OutOfMemoryError as tc : 
+        print(tc)
 
 print(f'Fragments processed = {len(all_embeddings)}')
 
@@ -187,7 +175,14 @@ print(save_emb.shape)
 torch.save(save_emb, f"{saving_folder}all_embeddings.pt")
 print(f'saved to {saving_folder}all_embeddings.pt')
 
-save_names = True
+print('saving attentions...')
+save_att = torch.stack(all_attentions, dim=0)
+print(save_att.shape)
+
+torch.save(save_att, f"{saving_folder}all_attentions.pt")
+print(f'saved to {saving_folder}all_attentions.pt')
+
+save_names = False
 if save_names : 
     with open(f'{saving_folder}proteins_names.pkl', 'wb') as file : 
         pickle.dump(names, file)
