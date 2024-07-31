@@ -676,8 +676,8 @@ class SparseEncoder(nn.Module):
                 else : 
                     all_self_attentions = all_self_attentions + (layer_outputs[1],)
 
-            if proteins_interactions is not None : 
-                all_self_attentions = all_self_attentions + (layer_outputs[1],)
+            # if proteins_interactions is not None :
+            #     all_self_attentions = all_self_attentions + (layer_outputs[1],)
                 
         if self.emb_layer_norm_after:
             hidden_states = self.emb_layer_norm_after(hidden_states)

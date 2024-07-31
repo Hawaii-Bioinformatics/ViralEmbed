@@ -52,14 +52,14 @@ print(device)
 
 # DATA
 
-genome_fasta = '/home/thibaut/LongVirus/data/genoms_dataset.fa'
+#genome_fasta = '../data/results/LR760833.1.fasta'
 
-data = load_fasta_as_tuples(genome_fasta)
+# data = load_fasta_as_tuples(genome_fasta)
 
 
 # Charger la configuration et le modèle sauvegardés
 version = '3C' # or '5B'
-checkpoint = torch.load(f'/home/thibaut/mahdi/models/{version}/config_and_model.pth', map_location='cpu', weights_only=False)
+checkpoint = torch.load(f'./models/{version}/config_and_model.pth', map_location='cpu', weights_only=False)
 config = checkpoint['config']
 model_state_dict = checkpoint['model_state_dict']
 
@@ -69,10 +69,10 @@ sparse_model.load_state_dict(model_state_dict)
 sparse_model = sparse_model.to(device)
 sparse_model = sparse_model.eval()
 
-def get_embeddings(batch_inputs,i, proteins_sizes= None, selected_proteins= None, two_step_selection = True):
+def get_embeddings(batch_inputs,i, proteins_sizes= None, selected_proteins= None, pairwise_scores = True):
     attention_list = []
     with torch.no_grad():
-        outputs = sparse_model(input_ids=batch_inputs, output_attentions = True, proteins_sizes = proteins_sizes, proteins_interactions = selected_proteins, two_step_selection=two_step_selection) 
+        outputs = sparse_model(input_ids=batch_inputs, output_attentions = True, proteins_sizes = proteins_sizes, proteins_interactions = selected_proteins, two_step_selection=pairwise_scores)
         embeddings, attention_scores = outputs.logits, outputs.attentions
     return embeddings, attention_scores
 
@@ -90,7 +90,7 @@ all_attentions = []
 all_embeddings_esm = []
 all_attentions_esm = []
 
-saving_folder = '/home/thibaut/mahdi/saving_folder/' # For embeddings & Attentions
+# saving_folder = '/home/thibaut/mahdi/saving_folder/' # For embeddings & Attentions
 processed = []
 unprocessed = []
 names = []
@@ -126,63 +126,63 @@ def proteins_sizes_from_header(name) :
     return(ps_int)
 
 
-for i in tqdm(range(0, 1, batch_size)):
-    try : 
-        batch_labels, batch_strs, batch_tokens = batch_converter([data[i]])
-        batch_inputs = batch_tokens
-        batch_inputs = batch_inputs.to(device)
-        sparse_model = sparse_model.to(device)
-        genome_id = data[i][0]
-        print(f'Processing genome {genome_id} ({len(data[i][0])} amino acids)')
-        ps_int = proteins_sizes_from_header(genome_id)
-        print(f'Proteins sizes = {ps_int}')
-        proteins_sizes = torch.Tensor(ps_int)
-        print('Proteins pairs ranking...')
-        embeddings, attentions_ranks = get_embeddings(batch_inputs,i, proteins_sizes= proteins_sizes, selected_proteins=None, two_step_selection=True)
-        
-        print(embeddings.shape)
-        print(attentions_ranks)
-        selection = [1,6]
-        print('\n')
-        print(f'Attention pair {selection} processing...')
-        embeddings, attentions = get_embeddings(batch_inputs,i, proteins_sizes= proteins_sizes, selected_proteins=torch.Tensor(selection), two_step_selection=False)
-
-        print(embeddings.shape)
-        print(len(attentions),attentions[0].shape)
-        attentions_ag = torch.cat(attentions, dim=1)
-
-        # IF WE EXTRACT COMPLETE FRAGMENTS EMBEDDINGS & ATTENTIONS (only for 12k aa < sequences )
-
-        # extract = extract_embeddding(embeddings, genome_id, 0)
-        # print(extract.shape)
-        # extract_att = extract_attention(attentions, genome_id, 0,1)
-        # print(extract_att[0].shape)
-
-        all_embeddings.append(embeddings)
-        all_attentions.append(attentions_ag)
-        names.append(data[i][0])
-        processed.append(len(data[i][1]))
-
-    except torch.cuda.OutOfMemoryError as tc : 
-        print(tc)
-
-print(f'Fragments processed = {len(all_embeddings)}')
-
-print('saving embeddings...')
-save_emb = torch.stack(all_embeddings, dim=0)
-print(save_emb.shape)
-
-torch.save(save_emb, f"{saving_folder}all_embeddings.pt")
-print(f'saved to {saving_folder}all_embeddings.pt')
-
-print('saving attentions...')
-save_att = torch.stack(all_attentions, dim=0)
-print(save_att.shape)
-
-torch.save(save_att, f"{saving_folder}all_attentions.pt")
-print(f'saved to {saving_folder}all_attentions.pt')
-
-save_names = False
-if save_names : 
-    with open(f'{saving_folder}proteins_names.pkl', 'wb') as file : 
-        pickle.dump(names, file)
+# for i in tqdm(range(0, 1, batch_size)):
+#     try :
+#         batch_labels, batch_strs, batch_tokens = batch_converter([data[i]])
+#         batch_inputs = batch_tokens
+#         batch_inputs = batch_inputs.to(device)
+#         sparse_model = sparse_model.to(device)
+#         genome_id = data[i][0]
+#         print(f'Processing genome {genome_id} ({len(data[i][0])} amino acids)')
+#         ps_int = proteins_sizes_from_header(genome_id)
+#         print(f'Proteins sizes = {ps_int}')
+#         proteins_sizes = torch.Tensor(ps_int)
+#         print('Proteins pairs ranking...')
+#         embeddings, attentions_ranks = get_embeddings(batch_inputs,i, proteins_sizes= proteins_sizes, selected_proteins=None, two_step_selection=True)
+#
+#         print(embeddings.shape)
+#         print(attentions_ranks)
+#         selection = [1,6]
+#         print('\n')
+#         print(f'Attention pair {selection} processing...')
+#         embeddings, attentions = get_embeddings(batch_inputs,i, proteins_sizes= proteins_sizes, selected_proteins=torch.Tensor(selection), two_step_selection=False)
+#
+#         print(embeddings.shape)
+#         print(len(attentions),attentions[0].shape)
+#         attentions_ag = torch.cat(attentions, dim=1)
+#
+#         # IF WE EXTRACT COMPLETE FRAGMENTS EMBEDDINGS & ATTENTIONS (only for 12k aa < sequences )
+#
+#         # extract = extract_embeddding(embeddings, genome_id, 0)
+#         # print(extract.shape)
+#         # extract_att = extract_attention(attentions, genome_id, 0,1)
+#         # print(extract_att[0].shape)
+#
+#         all_embeddings.append(embeddings)
+#         all_attentions.append(attentions_ag)
+#         names.append(data[i][0])
+#         processed.append(len(data[i][1]))
+#
+#     except torch.cuda.OutOfMemoryError as tc :
+#         print(tc)
+#
+# print(f'Fragments processed = {len(all_embeddings)}')
+#
+# print('saving embeddings...')
+# save_emb = torch.stack(all_embeddings, dim=0)
+# print(save_emb.shape)
+#
+# torch.save(save_emb, f"{saving_folder}all_embeddings.pt")
+# print(f'saved to {saving_folder}all_embeddings.pt')
+#
+# print('saving attentions...')
+# save_att = torch.stack(all_attentions, dim=0)
+# print(save_att.shape)
+#
+# torch.save(save_att, f"{saving_folder}all_attentions.pt")
+# print(f'saved to {saving_folder}all_attentions.pt')
+#
+# save_names = False
+# if save_names :
+#     with open(f'{saving_folder}proteins_names.pkl', 'wb') as file :
+#         pickle.dump(names, file)
