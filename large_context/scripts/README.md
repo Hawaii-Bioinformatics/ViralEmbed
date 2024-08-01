@@ -39,7 +39,7 @@ Embeds contains:
   - The pairwise scores as a dict. Key is pair value is attention score non-normalized.  
 
 
-embeds = get_embeddings(batch_tokens, [0], torch.tensor(protein_sizes), torch.tensor([13,14]), pairwise_scores=False)
+    embeds = get_embeddings(batch_tokens, [0], torch.tensor(protein_sizes), torch.tensor([13,14]), pairwise_scores=False)
 Above returns embeds[0] as The embeddings: 1, len(genome) +2 , 1280
 embeds[1] is a list of
 
