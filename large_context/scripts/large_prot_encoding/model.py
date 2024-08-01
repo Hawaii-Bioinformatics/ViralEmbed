@@ -189,10 +189,10 @@ class SparseSelfAttention(nn.Module) :
         # To extract the attention : use proteins_sizes, proteins_interactions -> Attention row (attention for 1 protein to all proteins)
         if proteins_interactions is not None :
             proteins_sizes_cum = self.cumulative_sum(proteins_sizes.tolist())
-            start_0 = proteins_sizes_cum[int(proteins_interactions[0])]
-            end_0 = proteins_sizes_cum[int(proteins_interactions[0])+1]
-            start_1 = proteins_sizes_cum[int(proteins_interactions[1])]
-            end_1 = proteins_sizes_cum[int(proteins_interactions[1])+1]
+            start_0 = proteins_sizes_cum[int(proteins_interactions[0])]+1
+            end_0 = proteins_sizes_cum[int(proteins_interactions[0])+1]+1
+            start_1 = proteins_sizes_cum[int(proteins_interactions[1])]+1
+            end_1 = proteins_sizes_cum[int(proteins_interactions[1])+1]+1
 
         # Positional encoding & Linear layers
         key_layer = self.key(hidden_states)
