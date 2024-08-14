@@ -5,9 +5,9 @@
 
 This script is used to rank pairs of proteins in a genome 
 
-inputs are
-Fasta file of proteins  
-Attention file of complete genome.
+inputs are: 
+- Fasta file of proteins  
+- Attention file of complete genome.
 
 
 
