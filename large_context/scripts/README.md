@@ -29,7 +29,7 @@ data = load_fasta_as_tuples("../data/LR699048.fa")
 batch_labels, batch_strs, batch_tokens = batch_converter([data[0]])
 protein_sizes = proteins_sizes_from_header(data[0][0])
 embeds = get_embeddings(batch_tokens, [0], torch.tensor(protein_sizes), None, pairwise_scores=True)
-Above, None, mean we are not selecting a specifc pair of prteins to return
+Above, None, mean we are not selecting a specific pair of proteins to return
 pairwise_scores returns all the pairwise scores
 
 Embeds contains:

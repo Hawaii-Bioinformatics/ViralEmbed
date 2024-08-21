@@ -414,53 +414,53 @@ def combined_heatmap(top_interactions, save_path = None, consecutive = False):
         plt.savefig(save_path)
 
 
-if run :     
-    all_top_pairs, all_top_pairs_nc, global_length, non_consecutive_length, database_dic, all_top_pairs_labeled , all_top_pairs_labeled_nc = get_pairs_dataset(hel_pol_rnr_assembled_fasta, attention_path, labels_folder)
-
-    # Save interactions in a pickle file to avoid all the code above
-    with open(pkl_save_path+f'all_top_pairs_nc_{saving_id}.pkl', 'wb') as f:
-        pickle.dump(all_top_pairs_nc, f)
-
-    with open(pkl_save_path+f'all_top_pairs_{saving_id}.pkl', 'wb') as f:
-        pickle.dump(all_top_pairs, f)
-
-    with open(pkl_save_path+f'database_dic_{saving_id}.pkl', 'wb') as f:
-        pickle.dump(database_dic, f)
-
-    print(f"Pairs saved in {pkl_save_path}")
-
-else : 
-    # Load existing interaction pickle files
-    with open(pkl_save_path+'all_top_pairs_nc.pkl', 'rb') as f:
-        all_top_pairs_nc = pickle.load(f)
-
-    with open(pkl_save_path+'all_top_pairs.pkl', 'rb') as f:
-        all_top_pairs = pickle.load(f)
-
-
-# IF Labels are used
-labels = True     # TOFIX
-
-if labels : 
-    common_list = 'Phage protein'
-    results = get_results_dic(all_top_pairs_labeled, common_list)
-    results_norm = norm_results(results, threshold = 1)             # threshold = minimum number of apparitions across genomes
-    top_interactions = get_top_pairs(results_norm, i = 20)          # i = Number of pairs 
-
-    results_nc = get_results_dic(all_top_pairs_labeled_nc, common_list)
-    results_norm_nc = norm_results(results_nc, threshold = 1)       # threshold = minimum number of apparitions across genomes
-    top_interactions_nc = get_top_pairs(results_norm_nc, i = 20)    # i = Number of pairs
-
-
-if plot_figures : 
-    # NX chart for interactions
-    plot_interaction_graph(top_interactions, pkl_save_path+f'20_interactions_nx_{saving_id}.png', consecutive = True)
-    plot_interaction_graph(top_interactions_nc,  pkl_save_path+f'20_nc_interactions_nx_{saving_id}.png')
-
-    # Heatmap (1 block = 1 cluster)
-    combined_heatmap(top_interactions, pkl_save_path+f'20_interactions_sns_{saving_id}.png', consecutive = True)
-    combined_heatmap(top_interactions_nc,  pkl_save_path+f'20_nc_interactions_sns_{saving_id}.png')
-
-else : 
-    print(top_interactions_nc)
-    print(top_interactions)
+# if run :
+#     all_top_pairs, all_top_pairs_nc, global_length, non_consecutive_length, database_dic, all_top_pairs_labeled , all_top_pairs_labeled_nc = get_pairs_dataset(hel_pol_rnr_assembled_fasta, attention_path, labels_folder)
+#
+#     # Save interactions in a pickle file to avoid all the code above
+#     with open(pkl_save_path+f'all_top_pairs_nc_{saving_id}.pkl', 'wb') as f:
+#         pickle.dump(all_top_pairs_nc, f)
+#
+#     with open(pkl_save_path+f'all_top_pairs_{saving_id}.pkl', 'wb') as f:
+#         pickle.dump(all_top_pairs, f)
+#
+#     with open(pkl_save_path+f'database_dic_{saving_id}.pkl', 'wb') as f:
+#         pickle.dump(database_dic, f)
+#
+#     print(f"Pairs saved in {pkl_save_path}")
+#
+# else :
+#     # Load existing interaction pickle files
+#     with open(pkl_save_path+'all_top_pairs_nc.pkl', 'rb') as f:
+#         all_top_pairs_nc = pickle.load(f)
+#
+#     with open(pkl_save_path+'all_top_pairs.pkl', 'rb') as f:
+#         all_top_pairs = pickle.load(f)
+#
+#
+# # # IF Labels are used
+# # labels = True     # TOFIX
+# #
+# # if labels :
+# #     common_list = 'Phage protein'
+# #     results = get_results_dic(all_top_pairs_labeled, common_list)
+# #     results_norm = norm_results(results, threshold = 1)             # threshold = minimum number of apparitions across genomes
+# #     top_interactions = get_top_pairs(results_norm, i = 20)          # i = Number of pairs
+# #
+# #     results_nc = get_results_dic(all_top_pairs_labeled_nc, common_list)
+# #     results_norm_nc = norm_results(results_nc, threshold = 1)       # threshold = minimum number of apparitions across genomes
+# #     top_interactions_nc = get_top_pairs(results_norm_nc, i = 20)    # i = Number of pairs
+# #
+# #
+# # if plot_figures :
+# #     # NX chart for interactions
+# #     plot_interaction_graph(top_interactions, pkl_save_path+f'20_interactions_nx_{saving_id}.png', consecutive = True)
+# #     plot_interaction_graph(top_interactions_nc,  pkl_save_path+f'20_nc_interactions_nx_{saving_id}.png')
+# #
+# #     # Heatmap (1 block = 1 cluster)
+# #     combined_heatmap(top_interactions, pkl_save_path+f'20_interactions_sns_{saving_id}.png', consecutive = True)
+# #     combined_heatmap(top_interactions_nc,  pkl_save_path+f'20_nc_interactions_sns_{saving_id}.png')
+# #
+# # else :
+# #     print(top_interactions_nc)
+# #     print(top_interactions)
