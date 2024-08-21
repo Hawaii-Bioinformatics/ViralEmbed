@@ -209,7 +209,7 @@ class SparseSelfAttention(nn.Module) :
             if proteins_interactions is not None : 
                 outputs = self.compute_attention_block_softmax(query_layer, key_layer, value_layer, start_0, end_0, start_1, end_1, proteins_interactions,proteins_sizes=proteins_sizes.tolist(),output_attentions=output_attentions,two_step_selection=two_step_selection)
             else :
-                outputs = self.compute_attention_block_softmax(query_layer, key_layer, value_layer,output_attentions=output_attentions,two_step_selection=two_step_selection,proteins_sizes=proteins_sizes.tolist())
+                outputs = self.compute_attention_block_softmax(query_layer, key_layer, value_layer,output_attentions=output_attentions,two_step_selection=two_step_selection)
 
         else : 
             spmd = torch.matmul(query_layer, key_layer.transpose(-1, -2))
