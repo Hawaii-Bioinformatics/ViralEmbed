@@ -63,7 +63,10 @@ def rank_assembled_pairs(proteins_sizes, attention_matrix) :
     a, b = min(attentions_scores_frag), max(attentions_scores_frag)  
 
     for pair, index_value, score in top_data_frag :
-        pair_counts_frag[pair] += (score-a)/(b-a)   # Fill dic (score to reduce threshold impact)
+        if b != a : 
+            pair_counts_frag[pair] += (score-a)/(b-a)   # Fill dic (score to reduce threshold impact) 
+        else : 
+            pair_counts_frag[pair] += score
         pair_index_sums_frag[pair] = index_value    # Fill dic with block size
 
     pair_normalizations_frag = {pair: count / pair_index_sums_frag[pair] for pair, count in pair_counts_frag.items()}   # Final dictionnary {(p1,p2) : score normalized by size}
