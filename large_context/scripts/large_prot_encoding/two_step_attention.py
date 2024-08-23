@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from collections import defaultdict
 
-
 def apc(x):
     a1 = x.sum(-1, keepdims=True)
     a2 = x.sum(-2, keepdims=True)
@@ -30,31 +29,38 @@ def get_attention_block(self_attention_t_weighted, p1_boundaries, p2_boundaries,
     else :     
         return mutual_information_tensor
 
-def get_contacts_numbers_torch(prot1, prot2, attention_block):
+def get_contacts_numbers_torch(prot1, prot2, attention_block, q2):
     attentions = attention_block.view(-1)
     size = attentions.size(0)
     contacts = [(prot1, prot2)] * size
-    list_attn = list(zip(contacts, [size] * size, attentions.tolist()))
+    att_select = [att for att in attentions.tolist() if att > q2*2] # *2 because we symmetrize by addition
+    list_attn = list(zip(contacts, [size] * size, att_select))
     return list_attn
 
-def get_pairs(length, segment_attentions) : 
+def get_pairs(length, segment_attentions, q2) : 
     # Get all the amino acid pairs and attention score of a fragment
     # Length is the list of proteins sizes
     all_pairs = []
     for i in range(len(length)-1) : # Over proteins
         for j in range(i+1, len(length)) : # Over proteins
             p1_start, p1_end, p2_start, p2_end = sum(length[:i]), sum(length[:i+1]),  sum(length[:j]), sum(length[:j+1])    # Get starting and ending amino acids index for protein pair
-            attention_block = get_attention_block(segment_attentions, (p1_start, p1_end), (p2_start, p2_end), apc_norm=True)    # Extract attention block
-            results = get_contacts_numbers_torch(i, j, attention_block) # Get the list [[(p1, p2), n1*n2, att] for each aa pair]
+            attention_block = get_attention_block(segment_attentions, (p1_start, p1_end), (p2_start, p2_end), apc_norm=False)    # Extract attention block
+            results = get_contacts_numbers_torch(i, j, attention_block, q2) # Get the list [[(p1, p2), n1*n2, att] for each aa pair]
             all_pairs.extend(results)
     return(all_pairs)
 
 def rank_assembled_pairs(proteins_sizes, attention_matrix) :
-    
-    pairs_frag = get_pairs(proteins_sizes, attention_matrix)   # Every amino acid pair, attention value : ((p1, p2), n1*n2, att)
-    atts = [item[2] for item in pairs_frag]
-    p2 = np.percentile(atts, 2)
-    top_data_frag = [item for item in pairs_frag if item[2] < p2 ]
+    t0 = t.time()
+    attention_matrix_np = attention_matrix.cpu().numpy()
+    q2 = np.percentile(attention_matrix_np, 98)
+    del attention_matrix_np
+    pairs_frag = get_pairs(proteins_sizes, attention_matrix, q2)   # Every amino acid pair, attention value : ((p1, p2), n1*n2, att)
+
+    #atts = [item[2] for item in pairs_frag]
+    #p2 = np.percentile(atts, 2)
+    #top_data_frag = [item for item in pairs_frag if item[2] < p2]
+    top_data_frag = [item for item in pairs_frag]
+
     
     pair_counts_frag = defaultdict(int) # New dic {(p1,p2):score}
     pair_index_sums_frag = defaultdict(int) # New dic {(p1,p2):n1*n2}
