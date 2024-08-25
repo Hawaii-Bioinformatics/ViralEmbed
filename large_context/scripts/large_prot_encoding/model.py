@@ -93,10 +93,12 @@ class SparseAttention(nn.Module):
         device = None, 
         init_device = None
     ):
+        print("In SparseAttention module forward method")
         self.device = device
         hidden_states_ln = self.LayerNorm(hidden_states)
         block_size = 32
 
+        print("Computing Self Attention")
         self_outputs = self.self_attention(
             hidden_states_ln,
             proteins_sizes=proteins_sizes,  # Assurez-vous que l'argument est nommé correctement ici
@@ -109,9 +111,15 @@ class SparseAttention(nn.Module):
             two_step_selection=two_step_selection,
             device = device
         )
+        print("Done computing Self Attention")
+
         hidden_states.to(init_device)
         attention_output = self.output(self_outputs[0], hidden_states)
         outputs = (attention_output,) + self_outputs[1:]  # add attentions if we output them
+        del self_outputs
+        del attention_output
+        del hidden_states
+        torch.cuda.empty_cache()
         return outputs
 
 # Self Attention class - Sparse attention method
@@ -185,6 +193,7 @@ class SparseSelfAttention(nn.Module) :
         key_padding_mask: Optional[torch.LongTensor] = None,
         device : torch.device = None,
     ) :
+        print("In SparseSelfAttention module forward method")
         bsz, q_len, hidden_dim = hidden_states.size()
         # To extract the attention : use proteins_sizes, proteins_interactions -> Attention row (attention for 1 protein to all proteins)
         if proteins_interactions is not None :
@@ -193,6 +202,8 @@ class SparseSelfAttention(nn.Module) :
             end_0 = proteins_sizes_cum[int(proteins_interactions[0])+1]+1
             start_1 = proteins_sizes_cum[int(proteins_interactions[1])]+1
             end_1 = proteins_sizes_cum[int(proteins_interactions[1])+1]+1
+
+
 
         # Positional encoding & Linear layers
         key_layer = self.key(hidden_states)
@@ -237,6 +248,11 @@ class SparseSelfAttention(nn.Module) :
             else :
                 outputs = (chunked_context_layer, attention_probs) if output_attentions else (chunked_context_layer,)
 
+        del key_layer
+        del query_layer
+        del value_layer
+        del context_layer
+        torch.cuda.empty_cache()
         return outputs
     
     def reshape_output(self, context_layer, hidden_dim):
@@ -516,8 +532,9 @@ class SparseLayer(nn.Module):
         device = None, 
         init_device = None
     ):
+        print("In SparseLayer module forward method")
         self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
-
+        print("Computing the attentions")
         self_attention_outputs = self.attention(
             hidden_states,
             proteins_sizes, 
@@ -530,6 +547,7 @@ class SparseLayer(nn.Module):
             device = device, 
             init_device = init_device
         )
+        print("Done Computing the attentions")
         attention_output = self_attention_outputs[0]
 
         # if decoder, the last output is tuple of self-attn cache
@@ -554,7 +572,7 @@ class SparseLayer(nn.Module):
 
         del layer_output
         del attention_output
-        #torch.cuda.empty_cache()
+        torch.cuda.empty_cache()
 
         if self.is_decoder:
             outputs = outputs + (present_key_value,)
@@ -620,15 +638,16 @@ class SparseEncoder(nn.Module):
         two_step_selection=False,
         output_hidden_states=False,
         return_dict=True,
+        device = None,
     ):
-        
+        print("In SparseEncoders' forward method")
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
         all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
 
         next_decoder_cache = () if use_cache else None
         for i, layer_module in enumerate(self.layer):
-        
+
             init_device = hidden_states.device
             
             num_gpus = torch.cuda.device_count()
@@ -642,8 +661,10 @@ class SparseEncoder(nn.Module):
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
             layer_head_mask = head_mask[i] if head_mask is not None else None
-            past_key_value = past_key_values[i] if past_key_values is not None else None   
+            past_key_value = past_key_values[i] if past_key_values is not None else None
 
+            print(f"device is {device}")
+            print(f"Computing layer Outputs for layer {i}")
             layer_outputs = layer_module(
                 hidden_states,
                 proteins_sizes, 
@@ -658,13 +679,13 @@ class SparseEncoder(nn.Module):
                 device, 
                 init_device
                 )
+            print(f"done computing layer Outputs")
 
             hidden_states = layer_outputs[0]
 
             if use_cache:
                 next_decoder_cache = next_decoder_cache + (layer_outputs[-1],)
             if output_attentions:
-
                 if two_step_selection : 
                     if all_self_attentions == () : 
                         all_self_attentions = layer_outputs[1]
@@ -699,6 +720,8 @@ class SparseEncoder(nn.Module):
                 ]
                 if v is not None
             )
+
+
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
             past_key_values=next_decoder_cache,
@@ -878,7 +901,7 @@ class SparseModel(nn.Module):
             If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding (see
             `past_key_values`).
         """
-        
+        print("In SparseModel's forward method")
         output_attentions = output_attentions if output_attentions is not None or proteins_interactions is not None else self.config.output_attentions
 
         output_hidden_states = (
@@ -927,6 +950,8 @@ class SparseModel(nn.Module):
         else:
             encoder_extended_attention_mask = None
 
+        print("Computing embeddings...")
+
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
@@ -949,6 +974,7 @@ class SparseModel(nn.Module):
             two_step_selection=two_step_selection,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            device=device
         )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
@@ -1128,6 +1154,7 @@ class SparseForTokenClassification(nn.Module):
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
             Labels for computing the token classification loss. Indices should be in `[0, ..., config.num_labels - 1]`.
         """
+        print("I am in SparseForTokenClassification's forward method")
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.model(
