@@ -15,6 +15,7 @@
 ### Model Weights (from server at /home/thibaut/mahdi/models/)
 
 1. **LV-5B Model**
+
    - Source: `/home/thibaut/mahdi/models/5B/config_and_model.pth`
    - Destination on FTP: `5B/config_and_model.pth`
    - Size: ~2.5 GB
@@ -31,6 +32,7 @@
 ## Method 1: Using FileZilla (Recommended)
 
 ### Step 1: Install FileZilla
+
 ```bash
 # Ubuntu/Debian
 sudo apt-get install filezilla
@@ -42,6 +44,7 @@ brew install --cask filezilla
 ```
 
 ### Step 2: Configure Connection
+
 1. Open FileZilla
 2. File → Site Manager → New Site
 3. Enter details:
@@ -55,11 +58,14 @@ brew install --cask filezilla
 4. Click "Connect"
 
 ### Step 3: Create Directory Structure
+
 Once connected, in the remote site panel (right side):
+
 1. Right-click → Create directory → Name it "5B"
 2. Right-click → Create directory → Name it "3C"
 
 ### Step 4: Upload Files
+
 1. Navigate to `/home/thibaut/mahdi/models/5B/` on local side (left panel)
 2. Select `config_and_model.pth`
 3. Drag to the `5B/` folder on remote side (right panel)
@@ -177,7 +183,7 @@ If you can't generate checksums locally, you can ask the GigaDB team to generate
 
 ### Step 1: Create readme.txt
 
-```bash
+````bash
 cat > readme.txt << 'EOF'
 # ViralEmbed: Pretrained Model Weights
 # Manuscript: GIGA-D-25-00436
@@ -240,7 +246,7 @@ model = SparseForTokenClassification(config=checkpoint['config'])
 model.load_state_dict(checkpoint['model_state_dict'])
 model = model.to('cuda')
 model.eval()
-```
+````
 
 ## System Requirements:
 
@@ -270,27 +276,29 @@ See LICENSE.md and LICENSE-DATA.md in GitHub repository.
 ## Contact:
 
 Primary Author:
-  Dr. Mahdi Belcaid
-  Email: mahdi@hawaii.edu
-  Institution: University of Hawaii
+Dr. Mahdi Belcaid
+Email: mahdi@hawaii.edu
+Institution: University of Hawaii
 
 Co-author / Technical Contact:
-  Thibaut Dejean
-  Email: thib.dejean69@gmail.com
+Thibaut Dejean
+Email: thib.dejean69@gmail.com
 
 GigaScience Data Curator:
-  Email: database@gigasciencejournal.com
+Email: database@gigasciencejournal.com
 
 ## Additional Information:
 
 For detailed documentation, see:
+
 - Repository README: https://github.com/Hawaii-Bioinformatics/ViralEmbed/blob/main/README.md
 - Technical documentation: https://github.com/Hawaii-Bioinformatics/ViralEmbed/blob/main/CLAUDE.md
 - Data availability answers: https://github.com/Hawaii-Bioinformatics/ViralEmbed/blob/main/answers_data_and_code.md
 
 Last updated: October 30, 2025
 EOF
-```
+
+````
 
 ### Step 2: Upload readme.txt
 
@@ -307,7 +315,7 @@ open -u user455,SUpJtMdfpOvFC files.gigadb.org
 put readme.txt
 bye
 "
-```
+````
 
 ---
 
@@ -342,6 +350,7 @@ ftp> bye
 ## Email Notification to Editors
 
 After upload is complete, send email to:
+
 - **To:** editorial@gigasciencejournal.com
 - **CC:** database@gigasciencejournal.com
 
@@ -363,6 +372,8 @@ FTP Upload Details:
   * 3C/config_and_model.pth (~2.5 GB) - LV-3C model weights
   * readme.txt - File descriptions and usage instructions
   * md5sums.txt - MD5 checksums for integrity verification
+
+
 
 GitHub Repository:
 - URL: https://github.com/Hawaii-Bioinformatics/ViralEmbed
@@ -400,6 +411,7 @@ Best regards,
 **Problem:** Can't connect to FTP server
 
 **Solutions:**
+
 1. Verify using standard FTP protocol (not SFTP)
 2. Check firewall settings (FTP uses ports 20-21)
 3. Try passive mode in FileZilla (File → Settings → Connection → FTP → Passive)
@@ -410,6 +422,7 @@ Best regards,
 **Problem:** Upload times out or fails for large files
 
 **Solutions:**
+
 1. Use `lftp` instead of standard FTP (better for large files)
 2. Enable binary mode: `ftp> binary`
 3. Increase timeout in client settings
@@ -421,6 +434,7 @@ Best regards,
 **Problem:** Cannot create directories or write files
 
 **Solutions:**
+
 1. Double-check username and password
 2. Verify logged in correctly
 3. Contact GigaDB support if permissions issue persists
@@ -430,6 +444,7 @@ Best regards,
 **Problem:** Uploaded file is corrupted or incomplete
 
 **Solutions:**
+
 1. Ensure binary mode is enabled (`ftp> binary`)
 2. Verify checksums match between local and uploaded files
 3. Re-upload if checksums don't match
@@ -464,12 +479,15 @@ After upload:
 ## Support Contacts
 
 **Technical Issues with FTP:**
+
 - Email: database@gigasciencejournal.com
 
 **General Questions:**
+
 - Email: editorial@gigasciencejournal.com
 
 **Author Contacts:**
+
 - Mahdi Belcaid: mahdi@hawaii.edu
 - Thibaut Dejean: thib.dejean69@gmail.com
 

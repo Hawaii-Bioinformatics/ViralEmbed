@@ -1,0 +1,10 @@
+4c7dc731f56310f2d82dc91581326fa9  viral.1.protein.faa.gz
+4c7dc731f56310f2d82dc91581326fa9  viral.1.protein.gpff.gz
+4a90a3ce7f9962218ee447dacd18d9ca  genomes_dataset_train.fa  
+5b8b958e01eb780b06f299106edbecfc  100_genomes_lv.faa
+f94b03cc090fa8801f85d78cac3a252f  pola_rnr_hel.pkl
+9f2a7766d4920f4d92a18c731da9e8de  pkl_pairs_gen5.tar.gz
+02bbe6c97c394905d38e015f3cdf6e37  data.tar.gz
+113622571b76d19feaf13aa249b8fc17  test_files.tar.gz
+9c218394e0ce48949129e796c4638f4a  3C/config_and_model.pth
+bb94d8fc8889765638868779c147d589  5B/config_and_model.pth
