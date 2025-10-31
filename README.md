@@ -1,6 +1,6 @@
 # ViralEmbed
 
-**Extending Protein Language Models to Viral Genomic Scale**
+## Extending Protein Language Models to Viral Genomic Scale
 
 ViralEmbed is a deep learning framework for analyzing viral protein sequences at genomic scale using transformer-based models with sparse attention mechanisms. The tool processes complete viral genomes (up to 61,000 amino acids) to predict protein-protein interactions and identify functional relationships between viral proteins through attention-based contact analysis.
 
