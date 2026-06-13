@@ -1,0 +1,25 @@
+*.pt
+*.pyc
+*checkpoint.ipynb
+*~
+large_context/scripts/large_prot_encoding/models
+CLAUDE.md
+answers_data_and_code.md
+ACTION_ITEMS_SUMMARY.md
+FTP_UPLOAD_INSTRUCTIONS.md
+readme_for_ftp.txt
+/paper
+/ftp_upload_manifest
+
+# OS / editor / cache junk
+.DS_Store
+**/.DS_Store
+.idea/
+**/.idea/
+__pycache__/
+**/__pycache__/
+
+# scratch / superseded
+will_test_data/
+cross_attention/
+*_old.py

@@ -1,0 +1,2 @@
+viral.1.protein.gpff.gz filter=lfs diff=lfs merge=lfs -text
+viral.1.protein.faa.gz filter=lfs diff=lfs merge=lfs -text
